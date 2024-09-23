@@ -2,6 +2,8 @@ import Home from "./Components/Home";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import SignIn from "./Components/SignIn";
 import SignUp from "./Components/SignUp";
+import LinkedInRedirect from "./LinkedInRedirect";
+import LinkedInCallback from "./Components/LinkedInCallback";
 
 function App() {
   return (
@@ -10,6 +12,8 @@ function App() {
         <Route path="/" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/linkedin-callback" Component={LinkedInCallback} />
+
         <Route
           path="*"
           element={

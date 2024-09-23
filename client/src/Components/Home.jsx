@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   Box,
   CssBaseline,
@@ -12,9 +12,12 @@ import MuiDrawer from "@mui/material/Drawer";
 import MuiAppBar from "@mui/material/AppBar";
 import ModelUpload from "./ModelUpload";
 import TreeView from "./TreeView";
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
 
 const drawerWidth = 340;
 
+// MUI styles for the Drawer and AppBar
 const openedMixin = (theme) => ({
   width: drawerWidth,
   transition: theme.transitions.create("width", {
@@ -81,10 +84,16 @@ const Drawer = styled(MuiDrawer, {
 
 const Home = () => {
   const [open, setOpen] = useState(false);
+  const user = useSelector((state) => state.user.value);
 
   const handleDrawer = () => {
     setOpen(!open);
   };
+
+  // Redirect if user is not authenticated
+  if (!user) {
+    return <Navigate to="/" />;
+  }
 
   return (
     <Box sx={{ display: "flex" }}>

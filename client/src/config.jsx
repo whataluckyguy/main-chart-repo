@@ -1,6 +1,6 @@
 export const LinkedInApi = {
   clientId: "86zllnqjpdcyws",
-  redirectUrl: "http://localhost:3000/",
+  redirectUrl: "http://localhost:5173/linkedin-callback",
   oauthUrl:
     "https://www.linkedin.com/oauth/v2/authorization?response_type=code",
   scope: "r_liteprofile%20r_emailaddress",

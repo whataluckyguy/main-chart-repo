@@ -27,9 +27,7 @@ except Exception as e:
 
 
 forAccessToken = 'https://www.linkedin.com/oauth/v2/accessToken'
-
 ForEmail = 'https://api.linkedin.com/v2/clientAwareMemberHandles?q=members&projection=(elements*(primary,type,handle~))'
-
 ForUserProfile = 'https://api.linkedin.com/v2/me?projection=(id,localizedFirstName,localizedLastName,profilePicture(displayImage~digitalmediaAsset:playableStreams))'
 
 def getAccessToken(code):
@@ -39,23 +37,25 @@ def getAccessToken(code):
     parameters = {
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': 'http://localhost:5173/',
-        'client_id':client_id,
-        'client_secret':client_secret
+        'redirect_uri': 'http://localhost:5173/linkedin-callback',
+        'client_id': client_id,
+        'client_secret': client_secret
     }
-    token = requests.post(forAccessToken,data=parameters,headers=Headers)
-    return token.json().get('access_token')
+    token_response = requests.post(forAccessToken, data=parameters, headers=Headers)
+    token_data = token_response.json()
+    print('Token Response:', token_data)  # Log the response
+    return token_data.get('access_token')
 
 def getUserProfile(accessToken):
     Headers = {
         "Authorization": "Bearer " + accessToken
     }
-    response = requests.get(ForUserProfile,headers=Headers).json()
+    response = requests.get(ForUserProfile, headers=Headers).json()
     profile = {
-        "id":response.get('id'),
-        "firstName":response.get('localizedFirstName'),
-        "lastName":response.get('localizedLastName'),
-        "profilePicture":response.get('profilePicture').get('displayImage~').get('elements')[0].get('identifiers')[0].get('identifier')
+        "id": response.get('id'),
+        "firstName": response.get('localizedFirstName'),
+        "lastName": response.get('localizedLastName'),
+        "profilePicture": response.get('profilePicture').get('displayImage~').get('elements')[0].get('identifiers')[0].get('identifier')
     }
     return profile
 
@@ -63,18 +63,18 @@ def getUserEmail(accessToken):
     Headers = {
         "Authorization": "Bearer " + accessToken
     }
-    email = requests.get(ForEmail,headers=Headers).json().get('elements')[0].get('handle~').get('emailAddress')
+    email = requests.get(ForEmail, headers=Headers).json().get('elements')[0].get('handle~').get('emailAddress')
     return email
 
-def addDataInDB(userProfile,userEmail,jwtToken):
+def addDataInDB(userProfile, userEmail, jwtToken):
     data = {
-        "userid":userProfile.get('id'),
-        "firstName":userProfile.get('firstName'),
-        "lastName":userProfile.get('lastName'),
-        "email":userEmail,
-        "jwtToken":jwtToken
+        "userid": userProfile.get('id'),
+        "firstName": userProfile.get('firstName'),
+        "lastName": userProfile.get('lastName'),
+        "email": userEmail,
+        "jwtToken": jwtToken
     }
-    if collection.find_one({"userid":userProfile.get('id')}):
+    if collection.find_one({"userid": userProfile.get('id')}):
         print("User already exists")
     else:
         collection.insert_one(data)
@@ -82,17 +82,41 @@ def addDataInDB(userProfile,userEmail,jwtToken):
 @server.route('/auth', methods=['GET'])
 def auth():
     code = request.args.get('code')
+    if not code:
+        return jsonify({'error': 'Authorization code is missing'}), 400
+
     accessToken = getAccessToken(code)
-    userProfile = getUserProfile(accessToken)
-    userEmail = getUserEmail(accessToken)
+    if not accessToken:
+        return jsonify({'error': 'Failed to retrieve access token'}), 400
+
+    try:
+        userProfile = getUserProfile(accessToken)
+        userEmail = getUserEmail(accessToken)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    expiration = datetime.utcnow() + timedelta(hours=1)
+    refresh_expiration = datetime.utcnow() + timedelta(days=7)
+
     jwtToken = jwt.encode({
-        'userid':userProfile.get('id'),
-        'firstName':userProfile.get('firstName'),
-        'lastName':userProfile.get('lastName'),
-        'email':userEmail,
-    },'secret',algorithm='HS256')
-    addDataInDB(userProfile,userEmail,jwtToken)
-    return jsonify({'token':jwtToken})
+        'userid': userProfile.get('id'),
+        'firstName': userProfile.get('firstName'),
+        'lastName': userProfile.get('lastName'),
+        'email': userEmail,
+        'exp': expiration
+    }, 'secret', algorithm='HS256')
+
+    refreshToken = jwt.encode({
+        'userid': userProfile.get('id'),
+        'firstName': userProfile.get('firstName'),
+        'lastName': userProfile.get('lastName'),
+        'email': userEmail,
+        'exp': refresh_expiration
+    }, 'secret', algorithm='HS256')
+
+    addDataInDB(userProfile, userEmail, jwtToken)
+    return jsonify({'token': jwtToken, 'refreshToken': refreshToken}), 201
+
 
 @server.route('/signup',methods=['POST'])
 def signup():
@@ -152,6 +176,10 @@ def verify_token():
 
     try:
         decoded = jwt.decode(token,'secret',algorithms=['HS256'])
+        user = collection.find_one({"email":decoded['email']})
+        print(user)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
         return jsonify({'valid':True}),200
     except jwt.ExpiredSignatureError:
         return jsonify({'valid':False,'error':'Token Expired'}),401

@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=c:\Users\lalit\Dev\LinkedinAuth\backend\.venv
+set VIRTUAL_ENV=c:\Users\lalit\Dev\main-chart-repo\server\.venv
 
 if not defined PROMPT set PROMPT=$P$G
 
